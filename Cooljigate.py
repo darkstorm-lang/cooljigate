@@ -162,7 +162,10 @@ class Verb(object):
             if key in FORM_POSTFIX:
                 ru += FORM_POSTFIX[key] + ' '
             ru += val.ru
-            en = '%s (%s, %s)' % (val.en, ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
+            postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
+            if tense == TENSE_IMPERATIVE:
+                postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
+            en = '%s (%s)' % (val.en, postfix)
 
             line = '%s, %s\n' % (en, ru)
             stream.write(line)
