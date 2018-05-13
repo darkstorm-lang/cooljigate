@@ -149,27 +149,28 @@ class Verb(object):
     def __init__(self):
         self.aspect = ASPECT_UNKNOWN
         self.meanings = []
-        self.present = {}
-        self.future = {}
-        self.past = {}
-        self.conditional = {}
-        self.imperative = {}
+        self.present = None
+        self.future = None
+        self.past = None
+        self.conditional = None
+        self.imperative = None
 
 
     def _write_tense(self, stream, tense, entries):
-        for key, val in entries.items():
-            ru = ''
-            if key in FORM_POSTFIX:
-                ru += FORM_POSTFIX[key] + ' '
-            ru += val.ru
-            postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
-            if tense == TENSE_IMPERATIVE:
-                postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
-            en = '%s (%s)' % (val.en, postfix)
+        if entries is not None:
+            for key, val in entries.items():
+                ru = ''
+                if key in FORM_POSTFIX:
+                    ru += FORM_POSTFIX[key] + ' '
+                ru += val.ru
+                postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
+                if tense == TENSE_IMPERATIVE:
+                    postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
+                en = '%s (%s)' % (val.en, postfix)
 
-            line = '%s, %s\n' % (en, ru)
-            stream.write(line)
-            sys.stdout.write(line)
+                line = '%s, %s\n' % (en, ru)
+                stream.write(line)
+                sys.stdout.write(line)
 
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
@@ -189,6 +190,7 @@ class Cooljigate(object):
     def __init__(self, args):
         """ Constructor """
         self.verb = args.verb
+        self.conditionals = args.conditionals
 
     def _get_document(self):
         url = "%s/%s" % (Cooljigate.CoolUrl, quote(self.verb))
@@ -230,8 +232,10 @@ class Cooljigate(object):
         result.past = get_tense_entries(soup, PAST_TENSE_FORMS)
         result.present = get_tense_entries(soup, PRESENT_TENSE_FORMS)
         result.future = get_tense_entries(soup, FUTURE_TENSE_FORMS)
-        result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
         result.imperative = get_tense_entries(soup, IMPERATIVE_TENSE_FORMS)
+
+        if self.conditionals:
+            result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
 
         output = open(result.get_filename(), mode='w', encoding='utf-8')
         result.write(output)
@@ -248,6 +252,9 @@ class Cooljigate(object):
 def main():
     """ Main script entry point """
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-c', '--conditionals',
+                        help='Include conditional tenses',
+                        dest='conditionals')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
 
