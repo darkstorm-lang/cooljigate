@@ -254,7 +254,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-c', '--conditionals',
                         help='Include conditional tenses',
-                        dest='conditionals')
+                        dest='conditionals',
+                        action='store_true')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
 
