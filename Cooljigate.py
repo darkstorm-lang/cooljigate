@@ -156,16 +156,21 @@ class Verb(object):
         self.imperative = None
 
 
-    def _write_tense(self, stream, tense, entries):
+    def _write_tense(self, stream, tense, entries, add_postfix):
         if entries is not None:
             for key, val in entries.items():
                 ru = ''
-                if key in FORM_POSTFIX:
-                    ru += FORM_POSTFIX[key] + ' '
+                if tense != TENSE_IMPERATIVE:
+                    if key in FORM_POSTFIX:
+                        ru += FORM_POSTFIX[key] + ' '
                 ru += val.ru
                 postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
                 if tense == TENSE_IMPERATIVE:
                     postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
+
+                if add_postfix:
+                    postfix += '%s|%s' % (postfix, add_postfix)
+
                 en = '%s (%s)' % (val.en, postfix)
 
                 line = '%s, %s\n' % (en, ru)
@@ -175,12 +180,12 @@ class Verb(object):
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
 
-    def write(self, stream):
-        self._write_tense(stream, TENSE_PRESENT, self.present),
-        self._write_tense(stream, TENSE_FUTURE, self.future)
-        self._write_tense(stream, TENSE_PAST, self.past)
-        self._write_tense(stream, TENSE_CONDITIONAL, self.conditional)
-        self._write_tense(stream, TENSE_IMPERATIVE, self.imperative)
+    def write(self, stream, postfix):
+        self._write_tense(stream, TENSE_PRESENT, self.present, postfix),
+        self._write_tense(stream, TENSE_FUTURE, self.future, postfix)
+        self._write_tense(stream, TENSE_PAST, self.past, postfix)
+        self._write_tense(stream, TENSE_CONDITIONAL, self.conditional, postfix)
+        self._write_tense(stream, TENSE_IMPERATIVE, self.imperative, postfix)
 
 
 class Cooljigate(object):
@@ -191,6 +196,17 @@ class Cooljigate(object):
         """ Constructor """
         self.verb = args.verb
         self.conditionals = args.conditionals
+        self.postfix = args.postfix or ''
+
+        if args.uni:
+            if len(self.postfix):
+                self.postfix += '|'
+            self.postfix += 'uni'
+
+        if args.multi:
+            if len(self.postfix):
+                self.postfix += '|'
+            self.postfix += 'multi'
 
     def _get_document(self):
         url = "%s/%s" % (Cooljigate.CoolUrl, quote(self.verb))
@@ -238,7 +254,7 @@ class Cooljigate(object):
             result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
 
         output = open(result.get_filename(), mode='w', encoding='utf-8')
-        result.write(output)
+        result.write(output, self.postfix)
         output.close()
         return 1
 
@@ -255,6 +271,18 @@ def main():
     parser.add_argument('-c', '--conditionals',
                         help='Include conditional tenses',
                         dest='conditionals',
+                        action='store_true')
+    parser.add_argument('-p', '--postfix',
+                        help='Additional text to add to the postfix section',
+                        dest='postfix',
+                        action='store')
+    parser.add_argument('-u', '--uni',
+                        help='Verb is a unidirectional verb',
+                        dest='uni',
+                        action='store_true')
+    parser.add_argument('-m', '--multi',
+                        help='Verb is a multidirectional verb',
+                        dest='multi',
                         action='store_true')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
