@@ -158,14 +158,19 @@ class Verb(object):
         self.imperative = None
 
 
-    def _write_tense(self, stream, tense, entries, add_postfix, include_verb):
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze):
         if entries is not None:
             for key, val in entries.items():
                 ru = ''
                 if tense != TENSE_IMPERATIVE:
                     if key in FORM_POSTFIX:
                         ru += FORM_POSTFIX[key] + ' '
-                ru += val.ru
+
+                if anki_cloze:
+                    ru += '[[oc%d::%s]]' % (cloze_id, val.ru)
+                    cloze_id += 1
+                else:
+                    ru += val.ru
                 postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
                 if tense == TENSE_IMPERATIVE:
                     postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
@@ -181,15 +186,22 @@ class Verb(object):
                 line += '%s, %s\n' % (en, ru)
                 stream.write(line)
 
+        return len(entries) if entries else 0
+
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
 
-    def write(self, stream, postfix, include_verb):
-        self._write_tense(stream, TENSE_PRESENT, self.present, postfix, include_verb),
-        self._write_tense(stream, TENSE_FUTURE, self.future, postfix, include_verb)
-        self._write_tense(stream, TENSE_PAST, self.past, postfix, include_verb)
-        self._write_tense(stream, TENSE_CONDITIONAL, self.conditional, postfix, include_verb)
-        self._write_tense(stream, TENSE_IMPERATIVE, self.imperative, postfix, include_verb)
+    def write(self, stream, postfix, include_verb, anki_cloze):
+        all_tenses = [
+            [ TENSE_PRESENT, self.present ],
+            [ TENSE_FUTURE, self.future ],
+            [ TENSE_PAST, self.past ],
+            [ TENSE_CONDITIONAL, self.conditional ],
+            [ TENSE_IMPERATIVE, self.imperative ]
+        ]
+        cloze_id = 0
+        for tense in all_tenses:
+            cloze_id += self._write_tense(stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze)
 
 
 class Cooljigate(object):
@@ -203,6 +215,7 @@ class Cooljigate(object):
         self.postfix = args.postfix or ''
         self.include_verb = args.include_verb
         self.write_to_disk = args.write_to_disk
+        self.anki_cloze = args.anki_cloze # wrap in the form [[oc1::conjugation]]
 
         if args.uni:
             if len(self.postfix):
@@ -215,7 +228,7 @@ class Cooljigate(object):
             self.postfix += 'multi'
 
     def _get_document(self):
-        url = "%s/%s" % (Cooljigate.CoolUrl, quote(self.verb))
+        url = "%s/%s" % (Cooljigate.CoolUrl, quote(self.verb.lower()))
 
         # check if we have cached this file
         cache_name = os.path.join(tempfile.gettempdir(), make_fs_safe_name(url))
@@ -260,7 +273,7 @@ class Cooljigate(object):
             result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
 
         output = StringIO()
-        result.write(output, self.postfix, self.include_verb)
+        result.write(output, self.postfix, self.include_verb, self.anki_cloze)
         output = output.getvalue()
         sys.stdout.write(output)
 
@@ -303,6 +316,10 @@ def main():
     parser.add_argument('-w', '--write',
                         help='Write the output to disk using an automatically generated name',
                         dest='write_to_disk',
+                        action='store_true')
+    parser.add_argument('-a', '--anki_cloze',
+                        help='Surround verb conjugations by cloze deletions used by Cloze Overlapper plugin (https://ankiweb.net/shared/info/969733775)',
+                        dest='anki_cloze',
                         action='store_true')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
