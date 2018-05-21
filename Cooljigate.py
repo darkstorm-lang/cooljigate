@@ -13,6 +13,7 @@ import sys
 import tempfile
 import argparse
 import os
+from io import StringIO
 from urllib.request import urlopen, quote
 from bs4 import BeautifulSoup
 
@@ -179,7 +180,6 @@ class Verb(object):
                     line = '%s (%s), ' % (self.text, ASPECT_POSTFIX[self.aspect])
                 line += '%s, %s\n' % (en, ru)
                 stream.write(line)
-                sys.stdout.write(line)
 
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
@@ -202,6 +202,7 @@ class Cooljigate(object):
         self.conditionals = args.conditionals
         self.postfix = args.postfix or ''
         self.include_verb = args.include_verb
+        self.write_to_disk = args.write_to_disk
 
         if args.uni:
             if len(self.postfix):
@@ -258,9 +259,15 @@ class Cooljigate(object):
         if self.conditionals:
             result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
 
-        output = open(result.get_filename(), mode='w', encoding='utf-8')
+        output = StringIO()
         result.write(output, self.postfix, self.include_verb)
-        output.close()
+        output = output.getvalue()
+        sys.stdout.write(output)
+
+        if self.write_to_disk:
+            with open(result.get_filename(), mode='w', encoding='utf-8') as file:
+                file.write(output)
+                file.close()
         return 1
 
 
@@ -292,6 +299,10 @@ def main():
     parser.add_argument('-v', '--include-verb',
                         help='Include the verb in the output',
                         dest='include_verb',
+                        action='store_true')
+    parser.add_argument('-w', '--write',
+                        help='Write the output to disk using an automatically generated name',
+                        dest='write_to_disk',
                         action='store_true')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
