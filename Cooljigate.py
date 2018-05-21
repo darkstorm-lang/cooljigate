@@ -146,7 +146,8 @@ class Entry(object):
         self.en = en
 
 class Verb(object):
-    def __init__(self):
+    def __init__(self, text):
+        self.text = text
         self.aspect = ASPECT_UNKNOWN
         self.meanings = []
         self.present = None
@@ -156,7 +157,7 @@ class Verb(object):
         self.imperative = None
 
 
-    def _write_tense(self, stream, tense, entries, add_postfix):
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb):
         if entries is not None:
             for key, val in entries.items():
                 ru = ''
@@ -173,19 +174,22 @@ class Verb(object):
 
                 en = '%s (%s)' % (val.en, postfix)
 
-                line = '%s, %s\n' % (en, ru)
+                line = ''
+                if include_verb:
+                    line = '%s (%s), ' % (self.text, ASPECT_POSTFIX[self.aspect])
+                line += '%s, %s\n' % (en, ru)
                 stream.write(line)
                 sys.stdout.write(line)
 
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
 
-    def write(self, stream, postfix):
-        self._write_tense(stream, TENSE_PRESENT, self.present, postfix),
-        self._write_tense(stream, TENSE_FUTURE, self.future, postfix)
-        self._write_tense(stream, TENSE_PAST, self.past, postfix)
-        self._write_tense(stream, TENSE_CONDITIONAL, self.conditional, postfix)
-        self._write_tense(stream, TENSE_IMPERATIVE, self.imperative, postfix)
+    def write(self, stream, postfix, include_verb):
+        self._write_tense(stream, TENSE_PRESENT, self.present, postfix, include_verb),
+        self._write_tense(stream, TENSE_FUTURE, self.future, postfix, include_verb)
+        self._write_tense(stream, TENSE_PAST, self.past, postfix, include_verb)
+        self._write_tense(stream, TENSE_CONDITIONAL, self.conditional, postfix, include_verb)
+        self._write_tense(stream, TENSE_IMPERATIVE, self.imperative, postfix, include_verb)
 
 
 class Cooljigate(object):
@@ -197,6 +201,7 @@ class Cooljigate(object):
         self.verb = args.verb
         self.conditionals = args.conditionals
         self.postfix = args.postfix or ''
+        self.include_verb = args.include_verb
 
         if args.uni:
             if len(self.postfix):
@@ -224,7 +229,7 @@ class Cooljigate(object):
     def run(self):
         text = self._get_document()
         soup = BeautifulSoup(text, "lxml")
-        result = Verb()
+        result = Verb(self.verb)
 
         # aspect
         imp = soup.find_all(attrs={"data-tooltip" : IMPERFECTIVE_TEXT})
@@ -254,7 +259,7 @@ class Cooljigate(object):
             result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
 
         output = open(result.get_filename(), mode='w', encoding='utf-8')
-        result.write(output, self.postfix)
+        result.write(output, self.postfix, self.include_verb)
         output.close()
         return 1
 
@@ -283,6 +288,10 @@ def main():
     parser.add_argument('-m', '--multi',
                         help='Verb is a multidirectional verb',
                         dest='multi',
+                        action='store_true')
+    parser.add_argument('-v', '--include-verb',
+                        help='Include the verb in the output',
+                        dest='include_verb',
                         action='store_true')
     parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
