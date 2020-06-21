@@ -25,3 +25,10 @@ put (нсв|imp|informal), ты клади
 put (нсв|imp|formal), вы кладите
 ```
 
+## Setting up the python env
+```
+> virtualenv --python=python3 .pyenv
+> source ./.pyenv/bin/activate
+> pip3 install -r requirement.txt
+> python3 Cooljigate.py --conditional класть
+```
