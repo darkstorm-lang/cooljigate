@@ -1,14 +1,14 @@
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Darkstorm Library
 # Copyright (C) 2018 Martin Slater
 # Created : Friday, 11 May 2018 10:11:57 AM
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 """ Looks up a verb in cooljigator and creates a file suitable for importing
 into Ankidroid with all forms """
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Imports
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 import sys
 import tempfile
 import argparse
@@ -17,13 +17,14 @@ from io import StringIO
 from urllib.request import urlopen, quote
 from bs4 import BeautifulSoup
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Constants
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 IMPERFECTIVE_TEXT = "Expresses incomplete action."
 PERFECTIVE_TEXT = "Expresses complete action."
 MEANING_STR = "This verb can also mean the following: "
+PERFECTIVE_COUNTERPART_STR = "This verb's perfective counterparts: "
 
 ASPECT_UNKNOWN = 0
 ASPECT_PERFECT = 1
@@ -94,7 +95,7 @@ TENSE_POSTFIX = {
     TENSE_CONDITIONAL: 'cond',
     TENSE_FUTURE: 'future',
     TENSE_PAST: 'past',
-    TENSE_IMPERATIVE:'imp'
+    TENSE_IMPERATIVE: 'imp'
 }
 
 FORM_POSTFIX = {
@@ -110,12 +111,13 @@ FORM_POSTFIX = {
 }
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Functions
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def make_fs_safe_name(filename):
     return "".join([c if c.isalpha() or c.isdigit() else '_' for c in filename]).strip()
+
 
 def find_entry_by_id(soup, tense):
     elem = soup.find(id=tense)
@@ -127,6 +129,7 @@ def find_entry_by_id(soup, tense):
         return Entry(en, ru)
     return None
 
+
 def get_tense_entries(soup, forms):
     result = {}
     for key, val in forms.items():
@@ -137,14 +140,16 @@ def get_tense_entries(soup, forms):
             result[key] = entry
     return result
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Class
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
 
 class Entry(object):
     def __init__(self, en, ru):
         self.ru = ru
         self.en = en
+
 
 class Verb(object):
     def __init__(self, text):
@@ -156,10 +161,17 @@ class Verb(object):
         self.past = None
         self.conditional = None
         self.imperative = None
+        self.other_aspect_verbs = []
 
-
-    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze):
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb):
         if entries is not None:
+            perf_verb_tense = None
+            if perf_verb is not None:
+                perf_tense = tense
+                if tense == TENSE_PRESENT:
+                    perf_tense = TENSE_FUTURE
+                perf_verb_tense = perf_verb.get_tense(perf_tense)
+
             for key, val in entries.items():
                 ru = ''
                 if tense != TENSE_IMPERATIVE:
@@ -171,37 +183,58 @@ class Verb(object):
                     cloze_id += 1
                 else:
                     ru += val.ru
-                postfix = '%s|%s' % (ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
-                if tense == TENSE_IMPERATIVE:
-                    postfix += '|%s' % ('formal' if key == FORM_PLURAL else 'informal')
 
-                if add_postfix:
-                    postfix += '%s|%s' % (postfix, add_postfix)
+                    if perf_verb_tense is not None:
+                        ru += ' / %s' % (perf_verb_tense[key].ru)
 
-                en = '%s (%s)' % (val.en, postfix)
+                if supress_postfix:
+                    stream.write('%s\n' % ru)
+                else:
+                    postfix = '%s|%s' % (
+                        ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
+                    if tense == TENSE_IMPERATIVE:
+                        postfix += '|%s' % ('formal' if key ==
+                                            FORM_PLURAL else 'informal')
 
-                line = ''
-                if include_verb:
-                    line = '%s (%s), ' % (self.text, ASPECT_POSTFIX[self.aspect])
-                line += '%s, %s\n' % (en, ru)
-                stream.write(line)
+                    if add_postfix:
+                        postfix += '%s|%s' % (postfix, add_postfix)
+
+                    en = '%s (%s)' % (val.en, postfix)
+
+                    line = ''
+                    if include_verb:
+                        line = '%s (%s), ' % (
+                            self.text, ASPECT_POSTFIX[self.aspect])
+                    line += '%s, %s\n' % (en, ru)
+                    stream.write(line)
 
         return len(entries) if entries else 0
 
     def get_filename(self):
         return make_fs_safe_name('to ' + '/'.join(self.meanings)) + '.txt'
 
-    def write(self, stream, postfix, include_verb, anki_cloze):
+    def get_tense(self, tense):
+        all_tenses = {
+            TENSE_PRESENT: self.present,
+            TENSE_FUTURE: self.future,
+            TENSE_PAST: self.past,
+            TENSE_CONDITIONAL: self.conditional,
+            TENSE_IMPERATIVE: self.imperative
+        }
+        return all_tenses[tense]
+
+    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb):
         all_tenses = [
-            [ TENSE_PRESENT, self.present ],
-            [ TENSE_FUTURE, self.future ],
-            [ TENSE_PAST, self.past ],
-            [ TENSE_CONDITIONAL, self.conditional ],
-            [ TENSE_IMPERATIVE, self.imperative ]
+            [TENSE_PRESENT, self.present],
+            [TENSE_FUTURE, self.future],
+            [TENSE_PAST, self.past],
+            [TENSE_CONDITIONAL, self.conditional],
+            [TENSE_IMPERATIVE, self.imperative]
         ]
         cloze_id = 0
         for tense in all_tenses:
-            cloze_id += self._write_tense(stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze)
+            cloze_id += self._write_tense(
+                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb)
 
 
 class Cooljigate(object):
@@ -215,7 +248,10 @@ class Cooljigate(object):
         self.postfix = args.postfix or ''
         self.include_verb = args.include_verb
         self.write_to_disk = args.write_to_disk
-        self.anki_cloze = args.anki_cloze # wrap in the form [[oc1::conjugation]]
+        # wrap in the form [[oc1::conjugation]]
+        self.anki_cloze = args.anki_cloze
+        self.suppress_postfix = args.suppress_postfix
+        self.print_header = args.print_header
 
         if args.uni:
             if len(self.postfix):
@@ -227,11 +263,11 @@ class Cooljigate(object):
                 self.postfix += '|'
             self.postfix += 'multi'
 
-    def _get_document(self):
-        url = "%s/%s" % (Cooljigate.CoolUrl, quote(self.verb.lower()))
-
+    def _get_document(self, verb):
+        url = "%s/%s" % (Cooljigate.CoolUrl, quote(verb.lower()))
         # check if we have cached this file
-        cache_name = os.path.join(tempfile.gettempdir(), make_fs_safe_name(url))
+        cache_name = os.path.join(
+            tempfile.gettempdir(), make_fs_safe_name(url))
         if os.path.exists(cache_name):
             return open(cache_name, mode='r', encoding='utf-8').read()
 
@@ -241,27 +277,62 @@ class Cooljigate(object):
         return response
 
     def run(self):
-        text = self._get_document()
-        soup = BeautifulSoup(text, "lxml")
-        result = Verb(self.verb)
+        verb = self.get_verb(self.verb)
+        other_aspect = None
+        if (len(verb.other_aspect_verbs) > 0):
+            other_aspect = self.get_verb(verb.other_aspect_verbs[0])
 
+        if other_aspect is not None:
+            if verb.aspect == ASPECT_PERFECT:
+                temp = verb
+                verb = other_aspect
+                other_aspect = temp
+
+        self.print(verb, other_aspect)
+
+    def get_verb(self, verb):
+        text = self._get_document(verb)
+        soup = BeautifulSoup(text, "lxml")
+        result = Verb(verb)
+
+        # print('-----------------\n' + verb + "\n---------------------")
         # aspect
-        imp = soup.find_all(attrs={"data-tooltip" : IMPERFECTIVE_TEXT})
+        imp = soup.find_all(attrs={"data-tooltip": IMPERFECTIVE_TEXT})
         if len(imp):
             result.aspect = ASPECT_IMPERFECT
+
+            other = soup.find_all(attrs={"data-tooltip": IMPERFECTIVE_TEXT})
         else:
-            perf  = soup.find_all(attrs={"data-tooltip" : PERFECTIVE_TEXT})
+            perf = soup.find_all(attrs={"data-tooltip": PERFECTIVE_TEXT})
             if len(perf):
                 result.aspect = ASPECT_PERFECT
             else:
                 print('No aspect found')
 
-        # meaning
         usage = soup.find(attrs={'id': 'usage-info'})
+
+        # get verbs in the other aspect
+        for link in usage.find_all('a'):
+            verb = link.get('href')
+            verb = verb[verb.rfind('/')+1:len(verb)]
+            result.other_aspect_verbs.append(verb)
+
+        # print(result.other_aspect_verbs)
+
+        # meaning
+        meaning = soup.find(attrs={'data-default': self.verb})
+        if meaning is not None:
+            body = meaning.contents[0]
+            result.meanings.append(body[body.find('(') + 1:body.rfind(')')])
+
+        # other meanings
         if usage.contents[0].startswith(MEANING_STR):
-            result.meanings = [ meaning.strip() for meaning in usage.contents[0][len(MEANING_STR):].split(',') ]
+            result.meanings.extend(
+                meaning.strip() for meaning in usage.contents[0][len(MEANING_STR):].split(','))
         else:
             print('No meanings found')
+
+        # print(result.meanings)
 
         # past tense
         result.past = get_tense_entries(soup, PAST_TENSE_FORMS)
@@ -270,10 +341,22 @@ class Cooljigate(object):
         result.imperative = get_tense_entries(soup, IMPERATIVE_TENSE_FORMS)
 
         if self.conditionals:
-            result.conditional = get_tense_entries(soup, CONDITIONAL_TENSE_FORMS)
+            result.conditional = get_tense_entries(
+                soup, CONDITIONAL_TENSE_FORMS)
 
+        return result
+
+    def print(self, imp_verb,  perf_verb):
         output = StringIO()
-        result.write(output, self.postfix, self.include_verb, self.anki_cloze)
+
+        if self.print_header:
+            if perf_verb is not None:
+                print("to %s (imp, perf)" % (imp_verb.meanings[0]))
+                print("%s / %s" % (imp_verb.text, perf_verb.text))
+            print("")
+        imp_verb.write(output, self.postfix,
+                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb)
+
         output = output.getvalue()
         sys.stdout.write(output)
 
@@ -284,11 +367,9 @@ class Cooljigate(object):
         return 1
 
 
-
-
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Main
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def main():
     """ Main script entry point """
@@ -301,9 +382,17 @@ def main():
                         help='Additional text to add to the postfix section',
                         dest='postfix',
                         action='store')
+    parser.add_argument('-s', '--suppress_postfix',
+                        help='Do not print the postfix section before the verb conjugation',
+                        dest='suppress_postfix',
+                        action='store_true')
     parser.add_argument('-u', '--uni',
                         help='Verb is a unidirectional verb',
                         dest='uni',
+                        action='store_true')
+    parser.add_argument('-r', '--header',
+                        help='Print header containing english and russian verbs',
+                        dest='print_header',
                         action='store_true')
     parser.add_argument('-m', '--multi',
                         help='Verb is a multidirectional verb',
@@ -321,8 +410,10 @@ def main():
                         help='Surround verb conjugations by cloze deletions used by Cloze Overlapper plugin (https://ankiweb.net/shared/info/969733775)',
                         dest='anki_cloze',
                         action='store_true')
-    parser.add_argument('verb', metavar='V', type=str, help='Verb to conjugate')
+    parser.add_argument('verb', metavar='V', type=str,
+                        help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
+
 
 if __name__ == "__main__":
     main()
