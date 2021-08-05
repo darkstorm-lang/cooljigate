@@ -163,7 +163,8 @@ class Verb(object):
         self.imperative = None
         self.other_aspect_verbs = []
 
-    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb):
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short):
+        short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY]
         if entries is not None:
             perf_verb_tense = None
             if perf_verb is not None:
@@ -173,6 +174,8 @@ class Verb(object):
                 perf_verb_tense = perf_verb.get_tense(perf_tense)
 
             for key, val in entries.items():
+                if short and key not in short:
+                    continue
                 ru = ''
                 if tense != TENSE_IMPERATIVE:
                     if key in FORM_POSTFIX:
@@ -223,7 +226,7 @@ class Verb(object):
         }
         return all_tenses[tense]
 
-    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb):
+    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb, short):
         all_tenses = [
             [TENSE_PRESENT, self.present],
             [TENSE_FUTURE, self.future],
@@ -234,7 +237,7 @@ class Verb(object):
         cloze_id = 0
         for tense in all_tenses:
             cloze_id += self._write_tense(
-                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb)
+                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb, short)
 
 
 class Cooljigate(object):
@@ -252,6 +255,7 @@ class Cooljigate(object):
         self.anki_cloze = args.anki_cloze
         self.suppress_postfix = args.suppress_postfix
         self.print_header = args.print_header
+        self.short = args.short
 
         if args.uni:
             if len(self.postfix):
@@ -355,7 +359,7 @@ class Cooljigate(object):
                 print("%s / %s" % (imp_verb.text, perf_verb.text))
             print("")
         imp_verb.write(output, self.postfix,
-                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb)
+                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb, self.short)
 
         output = output.getvalue()
         sys.stdout.write(output)
@@ -409,6 +413,10 @@ def main():
     parser.add_argument('-a', '--anki_cloze',
                         help='Surround verb conjugations by cloze deletions used by Cloze Overlapper plugin (https://ankiweb.net/shared/info/969733775)',
                         dest='anki_cloze',
+                        action='store_true')
+    parser.add_argument('-t', '--short',
+                        help='Only output 1st, 2nd and 3rd person forms',
+                        dest='short',
                         action='store_true')
     parser.add_argument('verb', metavar='V', type=str,
                         help='Verb to conjugate')
