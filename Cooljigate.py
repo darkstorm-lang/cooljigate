@@ -6,15 +6,16 @@
 """ Looks up a verb in cooljigator and creates a file suitable for importing
 into Ankidroid with all forms """
 
+import argparse
+import os
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import sys
 import tempfile
-import argparse
-import os
 from io import StringIO
-from urllib.request import urlopen, quote
+from urllib.request import quote, urlopen
+
 from bs4 import BeautifulSoup
 
 # -----------------------------------------------------------------------------
@@ -316,10 +317,14 @@ class Cooljigate(object):
         usage = soup.find(attrs={'id': 'usage-info'})
 
         # get verbs in the other aspect
-        for link in usage.find_all('a'):
-            verb = link.get('href')
-            verb = verb[verb.rfind('/')+1:len(verb)]
-            result.other_aspect_verbs.append(verb)
+        if usage is not None:
+            other_aspect = usage.find_all('a')
+            if other_aspect is not None:
+                for link in other_aspect:
+                    verb = link.get('href')
+                    verb = verb[verb.rfind('/')+1:len(verb)]
+                    if len(verb) > 0:
+                        result.other_aspect_verbs.append(verb)
 
         # print(result.other_aspect_verbs)
 
