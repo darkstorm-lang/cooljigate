@@ -1,3 +1,4 @@
+# coding=utf8
 # -----------------------------------------------------------------------------
 # Darkstorm Library
 # Copyright (C) 2018 Martin Slater
@@ -306,7 +307,8 @@ class Cooljigate(object):
         if len(imp):
             result.aspect = ASPECT_IMPERFECT
 
-            other = soup.find_all(attrs={"data-tooltip": IMPERFECTIVE_TEXT})
+            result.other = soup.find_all(
+                attrs={"data-tooltip": IMPERFECTIVE_TEXT})
         else:
             perf = soup.find_all(attrs={"data-tooltip": PERFECTIVE_TEXT})
             if len(perf):
