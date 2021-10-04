@@ -75,6 +75,15 @@ FUTURE_TENSE_FORMS = {
     FORM_THEY: 'future6'
 }
 
+ALT_FUTURE_TENSE_FORMS = {
+    FORM_I: 'p1',
+    FORM_YOU: 'p2',
+    FORM_HE: 'p3',
+    FORM_WE: 'p4',
+    FORM_PLURAL: 'p5',
+    FORM_THEY: 'p6'
+}
+
 CONDITIONAL_TENSE_FORMS = {
     FORM_MASC: 'conditional_singM',
     FORM_FEM: 'conditional_singF',
@@ -85,6 +94,11 @@ CONDITIONAL_TENSE_FORMS = {
 IMPERATIVE_TENSE_FORMS = {
     FORM_YOU: 'imperative2',
     FORM_PLURAL: 'imperative5'
+}
+
+ALT_IMPERATIVE_TENSE_FORMS = {
+    FORM_YOU: 'command2',
+    FORM_PLURAL: 'command4'
 }
 
 ASPECT_POSTFIX = {
@@ -189,7 +203,7 @@ class Verb(object):
                 else:
                     ru += val.ru
 
-                    if perf_verb_tense is not None:
+                    if key in perf_verb_tense:
                         ru += ' / %s' % (perf_verb_tense[key].ru)
 
                 if supress_postfix:
@@ -340,8 +354,6 @@ class Cooljigate(object):
         if usage.contents[0].startswith(MEANING_STR):
             result.meanings.extend(
                 meaning.strip() for meaning in usage.contents[0][len(MEANING_STR):].split(','))
-        else:
-            print('No meanings found')
 
         # print(result.meanings)
 
@@ -349,7 +361,12 @@ class Cooljigate(object):
         result.past = get_tense_entries(soup, PAST_TENSE_FORMS)
         result.present = get_tense_entries(soup, PRESENT_TENSE_FORMS)
         result.future = get_tense_entries(soup, FUTURE_TENSE_FORMS)
+        if len(result.future) == 0:
+            result.future = get_tense_entries(soup, ALT_FUTURE_TENSE_FORMS)
         result.imperative = get_tense_entries(soup, IMPERATIVE_TENSE_FORMS)
+        if len(result.imperative) == 0:
+            result.imperative = get_tense_entries(
+                soup, ALT_IMPERATIVE_TENSE_FORMS)
 
         if self.conditionals:
             result.conditional = get_tense_entries(
