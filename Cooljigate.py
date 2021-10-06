@@ -292,12 +292,18 @@ class Cooljigate(object):
             return open(cache_name, mode='r', encoding='utf-8').read()
 
         # update cache
-        response = urlopen(url,).read().decode('utf-8')
+        page = urlopen(url,)
+        if page.url == 'https://cooljugator.com/404':
+            return None
+        response = page.read().decode('utf-8')
         open(cache_name, mode='w', encoding='utf-8').write(response)
         return response
 
     def run(self):
         verb = self.get_verb(self.verb)
+        if verb is None:
+            print("Verb not found")
+            return
         other_aspect = None
         if (len(verb.other_aspect_verbs) > 0):
             other_aspect = self.get_verb(verb.other_aspect_verbs[0])
@@ -312,6 +318,8 @@ class Cooljigate(object):
 
     def get_verb(self, verb):
         text = self._get_document(verb)
+        if text is None:
+            return None
         soup = BeautifulSoup(text, "lxml")
         result = Verb(verb)
 
