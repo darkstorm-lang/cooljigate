@@ -203,7 +203,7 @@ class Verb(object):
                 else:
                     ru += val.ru
 
-                    if key in perf_verb_tense:
+                    if perf_verb_tense is not None and key in perf_verb_tense:
                         ru += ' / %s' % (perf_verb_tense[key].ru)
 
                 if supress_postfix:
