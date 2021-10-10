@@ -272,6 +272,7 @@ class Cooljigate(object):
         self.suppress_postfix = args.suppress_postfix
         self.print_header = args.print_header
         self.short = args.short
+        self.single_aspect = args.single_aspect
 
         if args.uni:
             if len(self.postfix):
@@ -305,7 +306,7 @@ class Cooljigate(object):
             print("Verb not found")
             return
         other_aspect = None
-        if (len(verb.other_aspect_verbs) > 0):
+        if not self.single_aspect and (len(verb.other_aspect_verbs) > 0):
             other_aspect = self.get_verb(verb.other_aspect_verbs[0])
 
         if other_aspect is not None:
@@ -450,6 +451,11 @@ def main():
                         help='Only output 1st, 2nd and 3rd person forms',
                         dest='short',
                         action='store_true')
+    parser.add_argument('-o', '--only_verb',
+                        help='Only output the verb and not the other aspect as well',
+                        dest='single_aspect',
+                        action='store_true')
+
     parser.add_argument('verb', metavar='V', type=str,
                         help='Verb to conjugate')
     return Cooljigate(parser.parse_args()).run()
