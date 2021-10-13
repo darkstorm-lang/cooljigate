@@ -180,7 +180,7 @@ class Verb(object):
         self.other_aspect_verbs = []
 
     def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short):
-        short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY]
+        short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY, FORM_MASC, FORM_FEM]
         if entries is not None:
             perf_verb_tense = None
             if perf_verb is not None:
