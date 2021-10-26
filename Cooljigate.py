@@ -389,7 +389,7 @@ class Cooljigate(object):
         if self.print_header:
             if perf_verb is not None:
                 print("to %s (imp, perf)" % (imp_verb.meanings[0]))
-                print("%s / %s" % (imp_verb.text, perf_verb.text))
+                print("%s / %s" % (imp_verb.text.lower(), perf_verb.text.lower()))
             print("")
         imp_verb.write(output, self.postfix,
                        self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb, self.short)
