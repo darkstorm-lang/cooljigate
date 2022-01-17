@@ -179,7 +179,7 @@ class Verb(object):
         self.imperative = None
         self.other_aspect_verbs = []
 
-    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short):
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short, output_html):
         short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY]
         if entries is not None:
             perf_verb_tense = None
@@ -206,6 +206,9 @@ class Verb(object):
                     if perf_verb_tense is not None and key in perf_verb_tense:
                         ru += ' / %s' % (perf_verb_tense[key].ru)
 
+                if output_html:
+                    stream.write('<div>\n')
+
                 if supress_postfix:
                     stream.write('%s\n' % ru)
                 else:
@@ -226,6 +229,8 @@ class Verb(object):
                             self.text, ASPECT_POSTFIX[self.aspect])
                     line += '%s, %s\n' % (en, ru)
                     stream.write(line)
+                if output_html:
+                    stream.write('</div>\n')
 
         return len(entries) if entries else 0
 
@@ -242,7 +247,7 @@ class Verb(object):
         }
         return all_tenses[tense]
 
-    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb, short):
+    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb, short, output_html):
         all_tenses = [
             [TENSE_PRESENT, self.present],
             [TENSE_FUTURE, self.future],
@@ -250,10 +255,17 @@ class Verb(object):
             [TENSE_CONDITIONAL, self.conditional],
             [TENSE_IMPERATIVE, self.imperative]
         ]
+
+        if output_html:
+            stream.write('<div>\n')
+
         cloze_id = 0
         for tense in all_tenses:
             cloze_id += self._write_tense(
-                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb, short)
+                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb, short, output_html)
+
+        if output_html:
+            stream.write('</div>\n')
 
 
 class Cooljigate(object):
@@ -273,6 +285,7 @@ class Cooljigate(object):
         self.print_header = args.print_header
         self.short = args.short
         self.single_aspect = args.single_aspect
+        self.output_html = args.output_html
 
         if args.uni:
             if len(self.postfix):
@@ -388,11 +401,11 @@ class Cooljigate(object):
 
         if self.print_header:
             if perf_verb is not None:
-                print("to %s (imp, perf)" % (imp_verb.meanings[0]))
+                print("%s (imp, perf)" % (imp_verb.meanings[0]))
                 print("%s / %s" % (imp_verb.text, perf_verb.text))
             print("")
         imp_verb.write(output, self.postfix,
-                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb, self.short)
+                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb, self.short, self.output_html)
 
         output = output.getvalue()
         sys.stdout.write(output)
@@ -421,6 +434,7 @@ def main():
                         action='store')
     parser.add_argument('-s', '--suppress_postfix',
                         help='Do not print the postfix section before the verb conjugation',
+                        default='true',
                         dest='suppress_postfix',
                         action='store_true')
     parser.add_argument('-u', '--uni',
@@ -429,6 +443,7 @@ def main():
                         action='store_true')
     parser.add_argument('-r', '--header',
                         help='Print header containing english and russian verbs',
+                        default='true',
                         dest='print_header',
                         action='store_true')
     parser.add_argument('-m', '--multi',
@@ -449,11 +464,16 @@ def main():
                         action='store_true')
     parser.add_argument('-t', '--short',
                         help='Only output 1st, 2nd and 3rd person forms',
+                        default='true',
                         dest='short',
                         action='store_true')
     parser.add_argument('-o', '--only_verb',
                         help='Only output the verb and not the other aspect as well',
                         dest='single_aspect',
+                        action='store_true')
+    parser.add_argument('-x', '--html',
+                        help='Ouput HTML',
+                        dest='output_html',
                         action='store_true')
 
     parser.add_argument('verb', metavar='V', type=str,
