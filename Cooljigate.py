@@ -179,8 +179,14 @@ class Verb(object):
         self.imperative = None
         self.other_aspect_verbs = []
 
+
+<< << << < HEAD
     def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short, output_html):
         short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY]
+== == == =
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short):
+        short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY, FORM_MASC, FORM_FEM]
+>>>>>> > 04a9d5335172876b48681c606c6cad9ad01601de
         if entries is not None:
             perf_verb_tense = None
             if perf_verb is not None:
