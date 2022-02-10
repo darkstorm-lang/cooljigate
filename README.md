@@ -5,7 +5,7 @@ Uses the cooljuator.com site to get past, future, present, conditional and imper
 **Note that you need python3 to run the scipt**
 
 ```
-python3 Cooljigate.py --conditional класть
+python3 cooljigate.py --conditional класть
 
 I put (нсв|pres), я кладу
 you put (нсв|pres), ты кладёшь
@@ -30,5 +30,5 @@ put (нсв|imp|formal), вы кладите
 > virtualenv --python=python3 .pyenv
 > source ./.pyenv/bin/activate
 > pip3 install -r requirement.txt
-> python3 Cooljigate.py --conditional класть
+> python3 cooljigate.py --conditional класть
 ```
