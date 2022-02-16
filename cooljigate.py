@@ -179,7 +179,49 @@ class Verb(object):
         self.imperative = None
         self.other_aspect_verbs = []
 
-    def _write_tense(self, stream, tense, entries, add_postfix, include_verb, cloze_id, anki_cloze, supress_postfix, perf_verb, short, output_html):
+    def _get_tense_rows(self, stream, tense, entries, add_postfix, include_verb,  perf_verb, short_only):
+        short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY, FORM_MASC, FORM_FEM]
+        if entries is not None:
+            rows = []
+            perf_verb_tense = None
+            if perf_verb is not None:
+                perf_tense = tense
+                if tense == TENSE_PRESENT:
+                    perf_tense = TENSE_FUTURE
+                perf_verb_tense = perf_verb.get_tense(perf_tense)
+
+            for key, val in entries.items():
+                if short_only and key not in short:
+                    continue
+
+                row = []
+                form_postfix = ''
+                if tense != TENSE_IMPERATIVE:
+                    if key in FORM_POSTFIX:
+                        form_postfix = FORM_POSTFIX[key] + ' '
+
+                perf_val = ''
+                if perf_verb_tense is not None and key in perf_verb_tense:
+                    perf_val = perf_verb_tense[key].ru
+
+                postfix = '%s|%s' % (
+                    ASPECT_POSTFIX[self.aspect], TENSE_POSTFIX[tense])
+                if tense == TENSE_IMPERATIVE:
+                    postfix += '|%s' % ('formal' if key ==
+                                        FORM_PLURAL else 'informal')
+
+                if add_postfix:
+                    postfix += '%s|%s' % (postfix, add_postfix)
+
+                row.append(val.en)
+                row.append(form_postfix)
+                row.append(val.ru)
+                row.append(perf_val)
+                rows.append(row)
+
+            return rows
+
+    def _write_tense(self, stream, tense, entries, add_postfix, include_verb,  append_postfix, perf_verb, short_only):
         short = [FORM_I, FORM_HE, FORM_YOU, FORM_THEY, FORM_MASC, FORM_FEM]
         if entries is not None:
             perf_verb_tense = None
@@ -190,26 +232,19 @@ class Verb(object):
                 perf_verb_tense = perf_verb.get_tense(perf_tense)
 
             for key, val in entries.items():
-                if short and key not in short:
+                if short_only and key not in short:
                     continue
                 ru = ''
                 if tense != TENSE_IMPERATIVE:
                     if key in FORM_POSTFIX:
                         ru += FORM_POSTFIX[key] + ' '
 
-                if anki_cloze:
-                    ru += '[[oc%d::%s]]' % (cloze_id, val.ru)
-                    cloze_id += 1
-                else:
-                    ru += val.ru
+                ru += val.ru
 
-                    if perf_verb_tense is not None and key in perf_verb_tense:
-                        ru += ' / %s' % (perf_verb_tense[key].ru)
+                if perf_verb_tense is not None and key in perf_verb_tense:
+                    ru += ' / %s' % (perf_verb_tense[key].ru)
 
-                if output_html:
-                    stream.write('<div>\n')
-
-                if supress_postfix:
+                if not append_postfix:
                     stream.write('%s\n' % ru)
                 else:
                     postfix = '%s|%s' % (
@@ -229,8 +264,6 @@ class Verb(object):
                             self.text, ASPECT_POSTFIX[self.aspect])
                     line += '%s, %s\n' % (en, ru)
                     stream.write(line)
-                if output_html:
-                    stream.write('</div>\n')
 
         return len(entries) if entries else 0
 
@@ -247,8 +280,25 @@ class Verb(object):
         }
         return all_tenses[tense]
 
-    def write(self, stream, postfix, include_verb, anki_cloze, suppress_postfix, perf_verb, short, output_html):
-        all_tenses = [
+    def _format_string(self, str, style, doc_format):
+        str = str.strip()
+        if len(str) == 0:
+            return ""
+        if doc_format == "markdown":
+            if style == "italic":
+                return "_%s_" % (str)
+            elif style == "bold":
+                return "**%s**" % (str)
+        elif doc_format == "html":
+            if style == "italic":
+                return "<i>%s</i>" % (str)
+            elif style == "bold":
+                return "<b>%s</b>" % (str)
+
+        return str
+
+    def _all_tenses(self):
+        return [
             [TENSE_PRESENT, self.present],
             [TENSE_FUTURE, self.future],
             [TENSE_PAST, self.past],
@@ -256,16 +306,63 @@ class Verb(object):
             [TENSE_IMPERATIVE, self.imperative]
         ]
 
-        if output_html:
-            stream.write('<div>\n')
+    def write_markdown(self, stream, postfix, include_verb, append_postfix, perf_verb, short):
+        HEADERS = [
+            {
+                "title": "English",
+                "style": "italic",
+                "align": "left"
+            },
+            {
+                "title": "Form",
+                "style": "bold",
+                "align": "right"
+            },
+            {
+                "title": "Imperfective",
+                "style": "normal",
+                "align": "left"
+            },
+            {
+                "title": "Perfective",
+                "style": "normal",
+                "align": "left"
+            }
+        ]
 
-        cloze_id = 0
-        for tense in all_tenses:
-            cloze_id += self._write_tense(
-                stream, tense[0], tense[1], postfix, include_verb, cloze_id, anki_cloze, suppress_postfix, perf_verb, short, output_html)
+        MARKDOWN_TABLE_COLUMN = {
+            "left": "|:---",
+            "center": "|:---:",
+            "right": "|---:",
+        }
 
-        if output_html:
-            stream.write('</div>\n')
+        rows_to_print = [1, 2, 3]
+
+        if append_postfix:
+            rows_to_print = [0, 1, 2, 3]
+
+        # header
+        for row in rows_to_print:
+            stream.write("|" + HEADERS[row]["title"])
+        stream.write("|\n")
+        for row in rows_to_print:
+            stream.write(MARKDOWN_TABLE_COLUMN[HEADERS[row]["align"]])
+        stream.write("|\n")
+
+        for tense in self._all_tenses():
+            rows = self._get_tense_rows(
+                stream, tense[0], tense[1], postfix, include_verb,  perf_verb, short)
+            if rows:
+                for row in rows:
+                    for row_idx in rows_to_print:
+                        stream.write(
+                            "|" + self._format_string(row[row_idx], HEADERS[row_idx]["style"], "markdown"))
+                    stream.write("|\n")
+
+    def write_plaintext(self, stream, postfix, include_verb, append_postfix, perf_verb, short):
+        for tense in self._all_tenses():
+            self._write_tense(
+                stream, tense[0], tense[1], postfix, include_verb, append_postfix, perf_verb, short)
 
 
 class Cooljigate(object):
@@ -279,13 +376,13 @@ class Cooljigate(object):
         self.postfix = args.postfix or ''
         self.include_verb = args.include_verb
         self.write_to_disk = args.write_to_disk
-        # wrap in the form [[oc1::conjugation]]
-        self.anki_cloze = args.anki_cloze
-        self.suppress_postfix = args.suppress_postfix
+        self.append_postfix = args.add_postfix
         self.print_header = args.print_header
         self.short = args.short
         self.single_aspect = args.single_aspect
-        self.output_html = args.output_html
+        self.output_markdown = args.output_markdown or False
+
+        self.output_format = "markdown" if self.output_markdown else "plaintext"
 
         if args.uni:
             if len(self.postfix):
@@ -404,14 +501,20 @@ class Cooljigate(object):
                 print("%s (imp, perf)" % (imp_verb.meanings[0]))
                 print("%s / %s" % (imp_verb.text, perf_verb.text))
             print("")
-        imp_verb.write(output, self.postfix,
-                       self.include_verb, self.anki_cloze, self.suppress_postfix, perf_verb, self.short, self.output_html)
+
+        OUTPUT_FORMATS = {
+            "plaintext": imp_verb.write_plaintext,
+            "markdown": imp_verb.write_markdown
+        }
+
+        OUTPUT_FORMATS[self.output_format](output, self.postfix,
+                                           self.include_verb, self.append_postfix, perf_verb, self.short)
 
         output = output.getvalue()
         sys.stdout.write(output)
 
         if self.write_to_disk:
-            with open(result.get_filename(), mode='w', encoding='utf-8') as file:
+            with open(self.get_filename(), mode='w', encoding='utf-8') as file:
                 file.write(output)
                 file.close()
         return 1
@@ -432,10 +535,9 @@ def main():
                         help='Additional text to add to the postfix section',
                         dest='postfix',
                         action='store')
-    parser.add_argument('-s', '--suppress_postfix',
-                        help='Do not print the postfix section before the verb conjugation',
-                        default='true',
-                        dest='suppress_postfix',
+    parser.add_argument('-s', '--add_postfix',
+                        help='Print the english postfix section before the verb conjugation',
+                        dest='add_postfix',
                         action='store_true')
     parser.add_argument('-u', '--uni',
                         help='Verb is a unidirectional verb',
@@ -458,22 +560,17 @@ def main():
                         help='Write the output to disk using an automatically generated name',
                         dest='write_to_disk',
                         action='store_true')
-    parser.add_argument('-a', '--anki_cloze',
-                        help='Surround verb conjugations by cloze deletions used by Cloze Overlapper plugin (https://ankiweb.net/shared/info/969733775)',
-                        dest='anki_cloze',
-                        action='store_true')
     parser.add_argument('-t', '--short',
                         help='Only output 1st, 2nd and 3rd person forms',
-                        default='true',
                         dest='short',
                         action='store_true')
     parser.add_argument('-o', '--only_verb',
                         help='Only output the verb and not the other aspect as well',
                         dest='single_aspect',
                         action='store_true')
-    parser.add_argument('-x', '--html',
-                        help='Ouput HTML',
-                        dest='output_html',
+    parser.add_argument('-d', '--markdown',
+                        help='Output markdown',
+                        dest='output_markdown',
                         action='store_true')
 
     parser.add_argument('verb', metavar='V', type=str,
