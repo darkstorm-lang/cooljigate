@@ -464,6 +464,11 @@ class Cooljigate(object):
         # print(result.other_aspect_verbs)
 
         # meaning
+        def_meaning = soup.find(id='mainform')
+        if def_meaning:
+            body = def_meaning.contents[0]
+            result.meanings.append(body[body.find('(') + 1:body.rfind(')')])
+
         meaning = soup.find(attrs={'data-default': self.verb})
         if meaning is not None:
             body = meaning.contents[0]
